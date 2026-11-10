@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#090c11">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Mikes Board</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+html,body{margin:0;background:#090c11;color:#edf1f5;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#boot{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;text-align:center}
+#boot p{max-width:340px;margin:0 auto;color:#aab3bf}
+#boot b{color:#edf1f5}
+.spin{width:28px;height:28px;margin:0 auto 14px;border-radius:50%;border:3px solid #1d2632;border-top-color:#0093E7;animation:s 0.9s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="boot"><div><div class="spin" aria-hidden="true"></div><p>Mikes Board wird geladen …</p></div></div>
+<script>
+/* Mikes Board als App (PWA). Diese Seite ist nur die Hülle: Board und Daten holt sie bei deinem Apps Script.
+   Ohne den Zugangsschlüssel aus dem Board-Link liefert Google nichts aus. Schlüssel und Daten bleiben nur auf diesem Gerät. */
+(function(){
+'use strict';
+var API='https://script.google.com/macros/s/AKfycbyUw3pAIF2D42SFI06_VOZ4bktQuOJlaQbSz5t0kQeLVSEZyZGWXEFurfA6FfUMTDGQ/exec';
+var TK='mb.t',AK='mb.app',DK='mb.data',GK='mb.gone';
+window.addEventListener('beforeinstallprompt',function(e){window.__mbInstall=e;});
+var FNS=['getBoard','getData','refreshNow','requestRefresh','saveGarminKey','abgleich','saveWeekCard','getDayHr'];
+function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){}return null;}
+function boot(html){document.getElementById('boot').innerHTML='<div>'+html+'</div>';}
+
+/* Zugang aus dem Link übernehmen (#t=…) und sofort aus der Adresse entfernen */
+var m=/[#&]t=([A-Za-z0-9]{32,128})/.exec(location.hash||'');
+if(m){ls(TK,m[1]);ls(GK,null);try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}}
+var tok=ls(TK);
+if(!tok&&ls(GK)){boot('<p><b>Kein Zugang mehr.</b></p><p>Der Zugangsschlüssel gilt nicht mehr. Hol dir im Board unter <b>Info → MB als App</b> einen neuen App-Link und öffne ihn.</p>');return;}
+if(!tok){boot('<p><b>Noch nicht eingerichtet.</b></p><p>Öffne MB einmal wie bisher (Google-Link), dort unter <b>Info → MB als App</b> auf „App-Link holen“ tippen und den Link öffnen. Danach startet MB hier direkt.</p>');return;}
+
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){});
+
+function call(fn,args,ms){
+  var ac=ms&&window.AbortController?new AbortController():null,tm=ac?setTimeout(function(){ac.abort();},ms):0;
+  return fetch(API,{method:'POST',redirect:'follow',cache:'no-store',credentials:'omit',signal:ac?ac.signal:undefined,
+    headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({t:tok,fn:fn,args:args||[]})})
+  .then(function(r){clearTimeout(tm);return r;},function(e){clearTimeout(tm);throw ac&&ac.signal.aborted?new Error('Google antwortet gerade nicht (Zeitüberschreitung).'):e;})
+  .then(function(r){if(!r.ok)throw new Error('Google antwortet nicht (HTTP '+r.status+').');return r.text();})
+  .then(function(s){var o;try{o=JSON.parse(s);}catch(e){throw new Error('Antwort von Google nicht lesbar.');}
+    if(!o||!o.ok){var er=new Error((o&&o.error)||'Unbekannter Fehler');if(o&&o.auth)er.auth=true;throw er;}
+    return o.r;});
+}
+function wipe(){ls(TK,null);ls(AK,null);ls(DK,null);ls(GK,'1');}
+window.__mbWipe=wipe;
+function noAccess(){wipe();boot('<p><b>Kein Zugang mehr.</b></p><p>Der Zugangsschlüssel gilt nicht mehr. Hol dir im Board unter <b>Info → MB als App</b> einen neuen App-Link und öffne ihn.</p>');}
+
+/* Board und Daten parallel holen; ohne Netz die zuletzt gespeicherte Fassung nehmen */
+var pBoard=call('getBoard',[],20000).then(function(s){if(s&&s.length<4500000)ls(DK,s);return s;},function(e){
+  if(e.auth)throw e;var c=ls(DK);if(c){window.__mbOffline=String(e.message||e);return c;}throw e;});
+var pApp=call('getApp',[],20000).then(function(h){if(typeof h!=='string'||h.indexOf('Mikes Board')<0)throw new Error('Board nicht erhalten.');ls(AK,h);return h;},function(e){
+  if(e.auth)throw e;var c=ls(AK);if(c)return c;throw e;});
+pBoard.catch(function(){});
+
+pApp.then(function(html){
+  /* google.script.run nachbauen: jeder Aufruf geht als POST mit Zugangsschlüssel an Apps Script */
+  window.__mbCall=function(fn,args){if(fn==='getBoard'&&pBoard){var p=pBoard;pBoard=null;return p;}return call(fn,args);};
+  var shim='<script>(function(){window.MB_PWA=true;var FNS='+JSON.stringify(FNS)+';'+
+    'function runner(ok,fail){var o={withSuccessHandler:function(f){return runner(f,fail);},withFailureHandler:function(f){return runner(ok,f);},withUserObject:function(){return o;}};'+
+    'FNS.forEach(function(n){o[n]=function(){var a=Array.prototype.slice.call(arguments);window.__mbCall(n,a).then(function(r){if(ok)ok(r);},function(e){'+
+    'if(e&&e.auth&&window.__mbWipe)window.__mbWipe();if(fail)fail(e instanceof Error?e:new Error(String(e)));});};});return o;}'+
+    'window.google={script:{}};Object.defineProperty(window.google.script,"run",{get:function(){return runner(null,null);}});'+
+    /* nach längerer Pause im Hintergrund frisch laden */
+    'window.addEventListener("beforeinstallprompt",function(e){window.__mbInstall=e;});'+
+    'var hid=0;document.addEventListener("visibilitychange",function(){if(document.hidden)hid=Date.now();else if(hid&&Date.now()-hid>15*60*1000)location.reload();});'+
+    '})();<\/script>';
+  var head='<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">'+
+    '<meta name="theme-color" content="#090c11"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png">';
+  document.open();
+  document.write('<!doctype html><html lang="de"><head><meta charset="utf-8">'+head+shim+'</head><body>'+html+'</body></html>');
+  document.close();
+},function(e){
+  if(e&&e.auth){noAccess();return;}
+  boot('<p><b>MB konnte nicht geladen werden.</b></p><p>'+String((e&&e.message)||e).replace(/[<>&]/g,'')+'</p><p><a href="" style="color:#0093E7">Erneut versuchen</a></p>');
+});
+})();
+</script>
+</body>
+</html>
