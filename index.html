@@ -29,7 +29,7 @@ html,body{margin:0;background:#090c11;color:#edf1f5;font:16px/1.5 system-ui,-app
 var API='https://script.google.com/macros/s/AKfycbyUw3pAIF2D42SFI06_VOZ4bktQuOJlaQbSz5t0kQeLVSEZyZGWXEFurfA6FfUMTDGQ/exec';
 var TK='mb.t',AK='mb.app',DK='mb.data',GK='mb.gone';
 window.addEventListener('beforeinstallprompt',function(e){window.__mbInstall=e;});
-var FNS=['getBoard','getData','refreshNow','requestRefresh','saveGarminKey','abgleich','saveWeekCard','getDayHr','planStart'];
+var FNS=['getBoard','getData','refreshNow','requestRefresh','saveGarminKey','abgleich','saveWeekCard','getDayHr','planStart','pushPrefs','pushTest','pushSub'];
 function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){}return null;}
 function boot(html){document.getElementById('boot').innerHTML='<div>'+html+'</div>';}
 
@@ -41,6 +41,8 @@ if(!tok&&ls(GK)){boot('<p><b>Kein Zugang mehr.</b></p><p>Der Zugangsschlüssel g
 if(!tok){boot('<p><b>Noch nicht eingerichtet.</b></p><p>Öffne MB einmal wie bisher (Google-Link), dort unter <b>Info → MB als App</b> auf „App-Link holen“ tippen und den Link öffnen. Danach startet MB hier direkt.</p>');return;}
 
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){});
+/* Für Benachrichtigungen: der Service Worker holt den Text mit demselben Zugang ab (bleibt auf diesem Gerät) */
+try{caches.open('mb-cfg').then(function(c){return c.put('cfg',new Response(JSON.stringify({t:tok,api:API})));}).catch(function(){});}catch(e){}
 
 function call(fn,args,ms){
   var ac=ms&&window.AbortController?new AbortController():null,tm=ac?setTimeout(function(){ac.abort();},ms):0;
@@ -52,7 +54,7 @@ function call(fn,args,ms){
     if(!o||!o.ok){var er=new Error((o&&o.error)||'Unbekannter Fehler');if(o&&o.auth)er.auth=true;throw er;}
     return o.r;});
 }
-function wipe(){ls(TK,null);ls(AK,null);ls(DK,null);ls(GK,'1');}
+function wipe(){ls(TK,null);ls(AK,null);ls(DK,null);ls(GK,'1');try{caches.delete('mb-cfg');}catch(e){}}
 window.__mbWipe=wipe;
 function noAccess(){wipe();boot('<p><b>Kein Zugang mehr.</b></p><p>Der Zugangsschlüssel gilt nicht mehr. Hol dir im Board unter <b>Info → MB als App</b> einen neuen App-Link und öffne ihn.</p>');}
 
