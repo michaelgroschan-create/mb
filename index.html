@@ -29,7 +29,7 @@ html,body{margin:0;background:#090c11;color:#edf1f5;font:16px/1.5 system-ui,-app
 var API='https://script.google.com/macros/s/AKfycbyUw3pAIF2D42SFI06_VOZ4bktQuOJlaQbSz5t0kQeLVSEZyZGWXEFurfA6FfUMTDGQ/exec';
 var TK='mb.t',AK='mb.app',DK='mb.data',GK='mb.gone';
 window.addEventListener('beforeinstallprompt',function(e){window.__mbInstall=e;});
-var FNS=['getBoard','getData','refreshNow','requestRefresh','saveGarminKey','abgleich','saveWeekCard','getDayHr'];
+var FNS=['getBoard','getData','refreshNow','requestRefresh','saveGarminKey','abgleich','saveWeekCard','getDayHr','planStart'];
 function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){}return null;}
 function boot(html){document.getElementById('boot').innerHTML='<div>'+html+'</div>';}
 
